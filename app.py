@@ -1,10 +1,8 @@
 """
 Pearlite Phase Analyser - Web Application
-Streamlit app with drawable canvas for pearlite phase quantification.
 """
 
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 from io import BytesIO
@@ -14,18 +12,31 @@ from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
+import base64
 
-st.set_page_config(
-    page_title="Pearlite Phase Analyser",
-    page_icon="🔬",
-    layout="wide"
-)
+# Fix for streamlit-drawable-canvas with newer Streamlit
+try:
+    import streamlit.elements.image as st_image
+    if not hasattr(st_image, 'image_to_url'):
+        def image_to_url(image, width, clamp, channels, output_format, image_id):
+            buffered = BytesIO()
+            if hasattr(image, 'save'):
+                image.save(buffered, format="PNG")
+            else:
+                Image.fromarray(np.array(image)).save(buffered, format="PNG")
+            return f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode()}"
+        st_image.image_to_url = image_to_url
+except:
+    pass
+
+from streamlit_drawable_canvas import st_canvas
+
+st.set_page_config(page_title="Pearlite Phase Analyser", page_icon="🔬", layout="wide")
 
 st.markdown("""
 <style>
     .main-header {text-align:center;padding:1.5rem;background:linear-gradient(90deg,#1a1a2e,#16213e);color:white;border-radius:10px;margin-bottom:1rem;}
     .main-header h1 {font-size:2.2rem;margin:0;}
-    .main-header p {opacity:0.9;margin-top:0.5rem;}
     .results-card {background:linear-gradient(135deg,#1a1a2e,#16213e);color:white;padding:1.5rem;border-radius:15px;text-align:center;margin:1rem 0;}
     .percentage-value {font-size:3rem;font-weight:bold;color:#4ade80;}
     .pixel-info {font-size:0.85rem;opacity:0.7;margin-top:0.5rem;}
@@ -36,13 +47,11 @@ def create_pdf(orig_img, ann_img, pct, painted, total, info):
     buf = BytesIO()
     c = pdf_canvas.Canvas(buf, pagesize=A4)
     w, h = A4
-    
     c.setFont("Helvetica-Bold", 24)
     c.drawCentredString(w/2, h-40*mm, "Pearlite Phase Analyser Report")
     c.setStrokeColor(colors.HexColor("#4ade80"))
     c.setLineWidth(3)
     c.line(30*mm, h-45*mm, w-30*mm, h-45*mm)
-    
     y = h - 60*mm
     c.setFont("Helvetica-Bold", 14)
     c.drawString(25*mm, y, "Sample Information")
@@ -51,7 +60,6 @@ def create_pdf(orig_img, ann_img, pct, painted, total, info):
                       ("Date", datetime.now().strftime('%Y-%m-%d %H:%M')), ("Notes", info['notes'])]:
         y -= 6*mm
         c.drawString(25*mm, y, f"{lbl}: {val}")
-    
     y -= 15*mm
     c.setFont("Helvetica-Bold", 14)
     c.drawString(25*mm, y, "Results")
@@ -62,7 +70,6 @@ def create_pdf(orig_img, ann_img, pct, painted, total, info):
     c.setFillColor(colors.HexColor("#16a34a"))
     c.drawString(70*mm, y, f"{pct:.2f}%")
     c.setFillColor(colors.black)
-    
     y -= 15*mm
     c.setFont("Helvetica-Bold", 14)
     c.drawString(25*mm, y, "Micrographs")
@@ -70,14 +77,12 @@ def create_pdf(orig_img, ann_img, pct, painted, total, info):
     c.setFont("Helvetica", 10)
     c.drawString(25*mm, y, "Original")
     c.drawString(110*mm, y, "Highlighted")
-    
     y -= 65*mm
     for img, x in [(orig_img, 25*mm), (ann_img, 110*mm)]:
         b = BytesIO()
         img.save(b, format='PNG')
         b.seek(0)
         c.drawImage(ImageReader(b), x, y, width=75*mm, height=60*mm, preserveAspectRatio=True)
-    
     c.save()
     buf.seek(0)
     return buf
@@ -90,23 +95,19 @@ def calc_pct(canvas_result, size):
     total = size[0] * size[1]
     return (painted/total)*100 if total > 0 else 0.0, painted, total
 
-# Header
 st.markdown('<div class="main-header"><h1>🔬 Pearlite Phase Analyser</h1><p>Upload image and paint pearlite regions</p></div>', unsafe_allow_html=True)
 
-# Sidebar
 with st.sidebar:
     st.markdown("## 🎨 Tools")
     tool = st.radio("Tool", ["✏️ Brush", "🧹 Eraser"])
     stroke_color = "rgba(220,50,50,0.7)" if "Brush" in tool else "rgba(0,0,0,0)"
     brush_size = st.slider("Brush Size", 2, 50, 15)
-    
     st.markdown("---")
     st.markdown("### 📝 Report Info")
     sample_id = st.text_input("Sample ID", "")
     operator = st.text_input("Operator", "")
     notes = st.text_area("Notes", "", height=70)
 
-# Main
 col1, col2 = st.columns([3, 1])
 
 with col1:
@@ -152,5 +153,4 @@ with col2:
         
         info = {'sample_id': sample_id or 'N/A', 'operator': operator or 'N/A', 'notes': notes or 'N/A'}
         pdf = create_pdf(display_img, annotated, pct, painted, total, info)
-        
         st.download_button("⬇️ Download PDF", pdf, f"pearlite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf", "application/pdf", use_container_width=True)
