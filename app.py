@@ -1,6 +1,6 @@
 """
 Pearlite Phase Analyser - Web Application
-Canvas overlays on image like glass.
+Transparent canvas overlays on image.
 """
 
 import streamlit as st
@@ -119,7 +119,7 @@ with st.sidebar:
     notes = st.text_area("Notes", height=80)
 
 # Main
-col1, col2 = st.columns([3, 1])
+col1, col2 = st.columns([4, 1])
 
 with col1:
     uploaded = st.file_uploader("Upload Microstructure Image", type=["png", "jpg", "jpeg", "bmp", "tiff"])
@@ -127,8 +127,8 @@ with col1:
     if uploaded:
         img = Image.open(uploaded).convert("RGB")
         
-        # Resize
-        max_w, max_h = 700, 500
+        # Larger size
+        max_w, max_h = 850, 600
         scale = min(max_w/img.width, max_h/img.height, 1.0)
         cw, ch = int(img.width * scale), int(img.height * scale)
         display_img = img.resize((cw, ch), Image.Resampling.LANCZOS)
@@ -136,29 +136,56 @@ with col1:
         # Convert to base64
         img_b64 = image_to_base64(display_img)
         
-        # Create overlay effect with CSS
+        # CSS to make canvas transparent and show image behind, centered
         st.markdown(f"""
         <style>
-            div[data-testid="stVerticalBlock"] div[data-testid="element-container"]:has(canvas) {{
-                background-image: url('data:image/png;base64,{img_b64}');
-                background-size: {cw}px {ch}px;
-                background-repeat: no-repeat;
-                background-position: top left;
+            /* Target the canvas container */
+            .stCanvasContainer {{
+                display: flex;
+                justify-content: center;
+            }}
+            
+            /* Make canvas background transparent and show image */
+            canvas {{
+                background-image: url('data:image/png;base64,{img_b64}') !important;
+                background-size: {cw}px {ch}px !important;
+                background-repeat: no-repeat !important;
+                background-color: transparent !important;
+            }}
+            
+            /* Center the canvas wrapper */
+            div[data-testid="stCustomComponentV1"] {{
+                display: flex;
+                justify-content: center;
+            }}
+            
+            /* Override any white background */
+            div[data-testid="stCustomComponentV1"] > div {{
+                background: transparent !important;
+            }}
+            
+            iframe {{
+                background: transparent !important;
             }}
         </style>
         """, unsafe_allow_html=True)
         
-        # Canvas with transparent background
+        # Centered container
+        st.markdown('<div style="display:flex; justify-content:center;">', unsafe_allow_html=True)
+        
+        # Canvas - no background color
         canvas_result = st_canvas(
             fill_color="rgba(0,0,0,0)",
             stroke_width=brush_size,
             stroke_color=stroke_color,
-            background_color="rgba(0,0,0,0)",
+            background_color="",
             height=ch,
             width=cw,
             drawing_mode="freedraw",
             key="canvas",
         )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
         
         total_px = cw * ch
         percentage, painted_px = calculate_percentage(canvas_result, total_px)
@@ -175,7 +202,7 @@ with col1:
 with col2:
     st.markdown("### Results")
     st.markdown(f"**Pearlite Fraction**")
-    st.markdown(f"<span style='font-size:2.5rem;color:#27ae60;font-weight:bold;'>{percentage:.2f}%</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='font-size:2.2rem;color:#27ae60;font-weight:bold;'>{percentage:.2f}%</span>", unsafe_allow_html=True)
     st.caption(f"Painted: {painted_px:,} px")
     st.caption(f"Total: {total_px:,} px")
     
