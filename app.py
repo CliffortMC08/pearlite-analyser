@@ -4,6 +4,7 @@ A Streamlit-based tool for quantifying pearlite phases in steel microstructure i
 """
 
 import streamlit as st
+from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 from io import BytesIO
@@ -13,35 +14,6 @@ from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
-import base64
-
-# Fix for streamlit-drawable-canvas compatibility with newer Streamlit versions
-import streamlit.elements.image as st_image
-if not hasattr(st_image, 'image_to_url'):
-    def _image_to_url(image, width, clamp, channels, output_format, image_id):
-        """Compatibility shim for older streamlit-drawable-canvas."""
-        from PIL import Image as PILImage
-        if isinstance(image, PILImage.Image):
-            buffered = BytesIO()
-            # Ensure RGB mode for compatibility
-            if image.mode == 'RGBA':
-                image = image.convert('RGB')
-            image.save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            return f"data:image/png;base64,{img_str}"
-        elif isinstance(image, np.ndarray):
-            img = PILImage.fromarray(image.astype('uint8'))
-            if img.mode == 'RGBA':
-                img = img.convert('RGB')
-            buffered = BytesIO()
-            img.save(buffered, format="PNG")
-            img_str = base64.b64encode(buffered.getvalue()).decode()
-            return f"data:image/png;base64,{img_str}"
-        return ""
-    st_image.image_to_url = _image_to_url
-
-# Now import canvas after the patch
-from streamlit_drawable_canvas import st_canvas
 
 # Page configuration
 st.set_page_config(
@@ -54,10 +26,6 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
-    }
-    
     .main-header {
         text-align: center;
         padding: 1.5rem 0;
@@ -114,9 +82,6 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
     }
-    
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -243,10 +208,6 @@ def main():
         brush_size = st.slider("Size (px)", 2, 50, 15)
         
         st.markdown("---")
-        st.markdown("### 👁️ Visibility")
-        show_overlay = st.checkbox("Show Paint Layer", value=True)
-        
-        st.markdown("---")
         st.markdown("### 📝 Sample Info (for report)")
         sample_id = st.text_input("Sample ID", placeholder="e.g., STEEL-001")
         operator = st.text_input("Operator", placeholder="Your name")
@@ -272,8 +233,8 @@ def main():
         )
         
         if uploaded_file is not None:
-            # Load image
-            image = Image.open(uploaded_file).convert('RGB')
+            # Load and process image
+            image = Image.open(uploaded_file).convert('RGBA')
             
             # Canvas sizing
             max_width = 700
@@ -286,15 +247,17 @@ def main():
             # Resize for display
             display_image = image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
             
-            # Convert to numpy array for canvas background
-            bg_array = np.array(display_image)
+            # Show the original image above canvas for reference
+            st.image(display_image, caption="Original Image (Reference)", use_column_width=False)
             
-            # Drawing canvas with numpy array background
+            st.markdown("**Draw on canvas below:**")
+            
+            # Drawing canvas (without background image to avoid compatibility issues)
             canvas_result = st_canvas(
                 fill_color="rgba(0, 0, 0, 0)",
                 stroke_width=brush_size,
-                stroke_color=stroke_color if show_overlay else "rgba(0, 0, 0, 0)",
-                background_image=Image.fromarray(bg_array),
+                stroke_color=stroke_color,
+                background_color="#ffffff",
                 update_streamlit=True,
                 height=canvas_h,
                 width=canvas_w,
@@ -303,6 +266,11 @@ def main():
             )
             
             percentage, painted, total = calculate_percentage(canvas_result, (canvas_w, canvas_h))
+            
+            # Store for report generation
+            st.session_state['display_image'] = display_image
+            st.session_state['canvas_result'] = canvas_result
+            st.session_state['canvas_size'] = (canvas_w, canvas_h)
         else:
             st.markdown("""
             <div style="
@@ -319,7 +287,6 @@ def main():
             """, unsafe_allow_html=True)
             percentage, painted, total = 0.0, 0, 0
             canvas_result = None
-            image = None
             canvas_w, canvas_h = 0, 0
     
     with col2:
@@ -341,32 +308,37 @@ def main():
             if st.button("📄 Generate PDF Report", type="primary", use_container_width=True):
                 with st.spinner("Generating..."):
                     try:
-                        display_image = image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
+                        display_image = st.session_state.get('display_image')
+                        canvas_result = st.session_state.get('canvas_result')
                         
-                        if canvas_result is not None and canvas_result.image_data is not None:
-                            canvas_array = canvas_result.image_data.astype(np.uint8)
-                            canvas_img = Image.fromarray(canvas_array, 'RGBA')
-                            annotated = display_image.copy().convert('RGBA')
-                            annotated = Image.alpha_composite(annotated, canvas_img).convert('RGB')
-                        else:
-                            annotated = display_image
-                        
-                        sample_info = {
-                            'sample_id': sample_id or 'N/A',
-                            'operator': operator or 'N/A',
-                            'notes': notes or 'N/A'
-                        }
-                        
-                        pdf = create_pdf_report(display_image, annotated, percentage, painted, total, sample_info)
-                        
-                        st.download_button(
-                            "⬇️ Download Report",
-                            data=pdf,
-                            file_name=f"pearlite_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-                        st.success("✅ Report ready!")
+                        if display_image is not None:
+                            # Convert to RGB for PDF
+                            display_rgb = display_image.convert('RGB')
+                            
+                            if canvas_result is not None and canvas_result.image_data is not None:
+                                canvas_array = canvas_result.image_data.astype(np.uint8)
+                                canvas_img = Image.fromarray(canvas_array, 'RGBA')
+                                annotated = display_image.copy()
+                                annotated = Image.alpha_composite(annotated, canvas_img).convert('RGB')
+                            else:
+                                annotated = display_rgb
+                            
+                            sample_info = {
+                                'sample_id': sample_id or 'N/A',
+                                'operator': operator or 'N/A',
+                                'notes': notes or 'N/A'
+                            }
+                            
+                            pdf = create_pdf_report(display_rgb, annotated, percentage, painted, total, sample_info)
+                            
+                            st.download_button(
+                                "⬇️ Download Report",
+                                data=pdf,
+                                file_name=f"pearlite_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                            st.success("✅ Report ready!")
                     except Exception as e:
                         st.error(f"Error: {str(e)}")
         else:
@@ -382,9 +354,9 @@ def main():
             margin-top: 1rem;
         ">
             <strong>💡 Tips:</strong><br>
-            • Brush highlights pearlite (dark regions)<br>
-            • Adjust brush size for precision<br>
-            • Toggle overlay to verify coverage
+            • Reference the image above<br>
+            • Draw on white canvas below<br>
+            • Paint areas matching pearlite
         </div>
         """, unsafe_allow_html=True)
 
