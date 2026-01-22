@@ -7,13 +7,13 @@ A web-based tool for quantifying pearlite phases in steel microstructure images.
 - **Image Upload**: Support for PNG, JPG, JPEG, BMP, TIFF formats
 - **Digital Painting**: Highlight pearlite regions with a red brush
 - **Eraser Tool**: Fix mistakes easily
-- **Adjustable Brush Size**: 2px to 50px
-- **Real-time Calculation**: Instant pearlite percentage calculation
+- **Adjustable Brush Size**: Flexible brush sizes
+- **Real-time Calculation**: Automatic pearlite percentage calculation
 - **PDF Reports**: Generate professional lab reports
 
 ## Live Demo
 
-🌐 [https://pearlite-analyser.streamlit.app](https://pearlite-analyser.streamlit.app)
+🌐 [Hugging Face Spaces](https://huggingface.co/spaces/CliffortMC08/pearlite-analyser)
 
 ## Local Development
 
@@ -31,33 +31,30 @@ cd pearlite-analyser
 pip install -r requirements.txt
 
 # Run the app
-streamlit run app.py
+python app.py
 ```
 
-The app will open at `http://localhost:8501`
+The app will open at `http://localhost:7860`
 
-## Deployment on Streamlit Cloud
+## Deployment
 
-1. Push this repository to GitHub
-2. Go to [Streamlit Cloud](https://share.streamlit.io)
-3. Sign in with GitHub
-4. Click "New app" and select this repository
-5. Set main file path to `app.py`
-6. Click "Deploy"
+### Hugging Face Spaces (Recommended)
+1. Create a new Space on [Hugging Face](https://huggingface.co/spaces)
+2. Select "Gradio" as the SDK
+3. Upload or connect your GitHub repo
+4. The app will deploy automatically
 
 ## How to Use
 
 1. **Upload** a microstructure image
-2. **Select Brush** tool from the sidebar
-3. **Paint** over pearlite regions (dark areas)
-4. **Use Eraser** to fix any mistakes
-5. **View Results** - percentage updates in real-time
-6. **Generate Report** - creates a PDF with your analysis
+2. **Paint** over pearlite regions with the red brush
+3. **Use Eraser** to fix any mistakes
+4. **Click Calculate** to update the percentage
+5. **Generate Report** - creates a PDF with your analysis
 
 ## Tech Stack
 
-- **Streamlit** - Web framework
-- **streamlit-drawable-canvas** - Drawing functionality
+- **Gradio** - Web framework with canvas support
 - **Pillow** - Image processing
 - **ReportLab** - PDF generation
 - **NumPy** - Pixel calculations
