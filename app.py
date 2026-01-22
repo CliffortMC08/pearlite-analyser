@@ -146,6 +146,20 @@ with col1:
             .label {{ font-size: 14px; color: #bdc3c7; }}
             .value {{ font-size: 28px; font-weight: bold; color: #2ecc71; }}
             .pixels {{ font-size: 12px; color: #95a5a6; }}
+            #saveBtn {{
+                background: #27ae60;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-weight: bold;
+                margin-top: 10px;
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+            }}
+            #saveBtn:hover {{ background: #2ecc71; }}
         </style>
         
         <div id="canvas-container">
@@ -163,6 +177,8 @@ with col1:
                 <div class="pixels">Total: {total_px:,} px</div>
             </div>
         </div>
+        
+        <button id="saveBtn" onclick="saveImage()">Save Highlighted Image for Report</button>
         
         <script>
         const canvas = document.getElementById('drawCanvas');
@@ -226,6 +242,21 @@ with col1:
             localStorage.setItem('pearlitePainted', count);
         }}
         
+        function saveImage() {{
+            const bgImg = document.getElementById('bgImage');
+            const combined = document.createElement('canvas');
+            combined.width = {cw};
+            combined.height = {ch};
+            const combCtx = combined.getContext('2d');
+            combCtx.drawImage(bgImg, 0, 0, {cw}, {ch});
+            combCtx.drawImage(canvas, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'highlighted_image.png';
+            link.href = combined.toDataURL('image/png');
+            link.click();
+        }}
+        
         canvas.addEventListener('mousedown', startDraw);
         canvas.addEventListener('mousemove', draw);
         canvas.addEventListener('mouseup', stopDraw);
@@ -252,17 +283,26 @@ with col2:
     st.markdown("### Generate Report")
     
     if uploaded:
-        st.markdown("Enter the percentage shown:")
-        report_pct = st.number_input("Pearlite %", min_value=0.0, max_value=100.0, value=0.0, step=0.01, label_visibility="collapsed")
+        report_pct = st.number_input("Pearlite %", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
         
         total = st.session_state.get('total', 0)
         painted = int((report_pct / 100) * total) if total > 0 else 0
         
+        st.markdown("---")
+        st.markdown("**Upload highlighted image:**")
+        highlighted_file = st.file_uploader("", type=["png"], key="highlighted", label_visibility="collapsed")
+        
         if st.button("Generate PDF Report", type="primary", use_container_width=True):
             display_img = st.session_state.get('display_img')
             if display_img:
+                # Use uploaded highlighted image or original
+                if highlighted_file:
+                    annotated_img = Image.open(highlighted_file).convert("RGB")
+                else:
+                    annotated_img = display_img
+                
                 pdf = create_pdf_report(
-                    display_img, display_img, report_pct, painted, total,
+                    display_img, annotated_img, report_pct, painted, total,
                     sample_id or "N/A", operator or "N/A", notes or "N/A"
                 )
                 st.download_button("Download PDF", pdf, 
