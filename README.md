@@ -13,7 +13,7 @@ A web-based tool for quantifying pearlite phases in steel microstructure images.
 
 ## Live Demo
 
-🌐 [https://pearlite-analyser.vercel.app](https://pearlite-analyser.vercel.app)
+🌐 [https://pearlite-analyser.streamlit.app](https://pearlite-analyser.streamlit.app)
 
 ## Local Development
 
@@ -24,7 +24,7 @@ A web-based tool for quantifying pearlite phases in steel microstructure images.
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/pearlite-analyser.git
+git clone https://github.com/CliffortMC08/pearlite-analyser.git
 cd pearlite-analyser
 
 # Install dependencies
@@ -36,12 +36,14 @@ streamlit run app.py
 
 The app will open at `http://localhost:8501`
 
-## Deployment on Vercel
+## Deployment on Streamlit Cloud
 
 1. Push this repository to GitHub
-2. Go to [Vercel](https://vercel.com)
-3. Import your GitHub repository
-4. Vercel will auto-detect Streamlit and deploy
+2. Go to [Streamlit Cloud](https://share.streamlit.io)
+3. Sign in with GitHub
+4. Click "New app" and select this repository
+5. Set main file path to `app.py`
+6. Click "Deploy"
 
 ## How to Use
 

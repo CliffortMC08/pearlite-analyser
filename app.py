@@ -15,20 +15,32 @@ from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
 import base64
 
-# Apply monkey-patch BEFORE importing drawable canvas
+# Fix for streamlit-drawable-canvas compatibility with newer Streamlit versions
 import streamlit.elements.image as st_image
 if not hasattr(st_image, 'image_to_url'):
     def _image_to_url(image, width, clamp, channels, output_format, image_id):
-        """Convert PIL Image to data URL for canvas background."""
-        if isinstance(image, Image.Image):
+        """Compatibility shim for older streamlit-drawable-canvas."""
+        from PIL import Image as PILImage
+        if isinstance(image, PILImage.Image):
             buffered = BytesIO()
+            # Ensure RGB mode for compatibility
+            if image.mode == 'RGBA':
+                image = image.convert('RGB')
             image.save(buffered, format="PNG")
+            img_str = base64.b64encode(buffered.getvalue()).decode()
+            return f"data:image/png;base64,{img_str}"
+        elif isinstance(image, np.ndarray):
+            img = PILImage.fromarray(image.astype('uint8'))
+            if img.mode == 'RGBA':
+                img = img.convert('RGB')
+            buffered = BytesIO()
+            img.save(buffered, format="PNG")
             img_str = base64.b64encode(buffered.getvalue()).decode()
             return f"data:image/png;base64,{img_str}"
         return ""
     st_image.image_to_url = _image_to_url
 
-# Now import the canvas after patch is applied
+# Now import canvas after the patch
 from streamlit_drawable_canvas import st_canvas
 
 # Page configuration
@@ -108,30 +120,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def pil_to_base64(image):
-    """Convert PIL Image to base64 data URL."""
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    return f"data:image/png;base64,{img_str}"
-
 def create_pdf_report(original_image, annotated_image, percentage, painted_pixels, total_pixels, sample_info):
     """Generate a professional PDF report."""
     buffer = BytesIO()
     c = pdf_canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
     
-    # Title
     c.setFont("Helvetica-Bold", 24)
     c.setFillColor(colors.HexColor("#1a1a2e"))
     c.drawCentredString(width/2, height - 40*mm, "Pearlite Phase Analyser Report")
     
-    # Line
     c.setStrokeColor(colors.HexColor("#4ade80"))
     c.setLineWidth(3)
     c.line(30*mm, height - 45*mm, width - 30*mm, height - 45*mm)
     
-    # Sample Information
     y_pos = height - 60*mm
     c.setFont("Helvetica-Bold", 14)
     c.setFillColor(colors.HexColor("#1a1a2e"))
@@ -148,7 +150,6 @@ def create_pdf_report(original_image, annotated_image, percentage, painted_pixel
     y_pos -= 6*mm
     c.drawString(25*mm, y_pos, f"Notes: {sample_info.get('notes', 'N/A')}")
     
-    # Results
     y_pos -= 15*mm
     c.setFont("Helvetica-Bold", 14)
     c.setFillColor(colors.HexColor("#1a1a2e"))
@@ -167,7 +168,6 @@ def create_pdf_report(original_image, annotated_image, percentage, painted_pixel
     y_pos -= 8*mm
     c.drawString(25*mm, y_pos, f"Painted Pixels: {painted_pixels:,}  |  Total Pixels: {total_pixels:,}")
     
-    # Images
     y_pos -= 15*mm
     c.setFont("Helvetica-Bold", 14)
     c.setFillColor(colors.HexColor("#1a1a2e"))
@@ -184,19 +184,16 @@ def create_pdf_report(original_image, annotated_image, percentage, painted_pixel
     
     y_pos -= img_height + 5*mm
     
-    # Original image
     orig_buffer = BytesIO()
     original_image.save(orig_buffer, format='PNG')
     orig_buffer.seek(0)
     c.drawImage(ImageReader(orig_buffer), 25*mm, y_pos, width=img_width, height=img_height, preserveAspectRatio=True)
     
-    # Annotated image
     ann_buffer = BytesIO()
     annotated_image.save(ann_buffer, format='PNG')
     ann_buffer.seek(0)
     c.drawImage(ImageReader(ann_buffer), 110*mm, y_pos, width=img_width, height=img_height, preserveAspectRatio=True)
     
-    # Footer
     c.setFont("Helvetica", 9)
     c.setFillColor(colors.gray)
     c.drawCentredString(width/2, 15*mm, "Pearlite Phase Analyser")
@@ -222,17 +219,12 @@ def calculate_percentage(canvas_result, image_size):
     return percentage, painted_pixels, total_pixels
 
 def main():
-    # Header
     st.markdown("""
     <div class="main-header">
         <h1>🔬 Pearlite Phase Analyser</h1>
         <p>Upload a microstructure image and highlight pearlite regions to calculate phase fraction</p>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Initialize state
-    if 'show_overlay' not in st.session_state:
-        st.session_state.show_overlay = True
     
     # Sidebar
     with st.sidebar:
@@ -280,27 +272,29 @@ def main():
         )
         
         if uploaded_file is not None:
+            # Load image
             image = Image.open(uploaded_file).convert('RGB')
             
             # Canvas sizing
-            max_width = 750
-            max_height = 550
+            max_width = 700
+            max_height = 500
             img_w, img_h = image.size
-            scale = min(max_width / img_w, max_height / img_h)
+            scale = min(max_width / img_w, max_height / img_h, 1.0)
             canvas_w = int(img_w * scale)
             canvas_h = int(img_h * scale)
             
+            # Resize for display
             display_image = image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
             
-            # Convert image to numpy array for canvas background
-            bg_image_array = np.array(display_image)
+            # Convert to numpy array for canvas background
+            bg_array = np.array(display_image)
             
-            # Canvas with numpy array background
+            # Drawing canvas with numpy array background
             canvas_result = st_canvas(
                 fill_color="rgba(0, 0, 0, 0)",
                 stroke_width=brush_size,
                 stroke_color=stroke_color if show_overlay else "rgba(0, 0, 0, 0)",
-                background_image=Image.fromarray(bg_image_array),
+                background_image=Image.fromarray(bg_array),
                 update_streamlit=True,
                 height=canvas_h,
                 width=canvas_w,
@@ -347,7 +341,6 @@ def main():
             if st.button("📄 Generate PDF Report", type="primary", use_container_width=True):
                 with st.spinner("Generating..."):
                     try:
-                        # Create annotated image
                         display_image = image.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
                         
                         if canvas_result is not None and canvas_result.image_data is not None:
