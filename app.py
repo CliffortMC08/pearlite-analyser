@@ -1,10 +1,9 @@
 """
 Pearlite Phase Analyser - Web Application
-Image with canvas overlay, captures annotated image for report.
+Image with canvas overlay.
 """
 
 import streamlit as st
-from streamlit_javascript import st_javascript
 from PIL import Image
 import numpy as np
 from io import BytesIO
@@ -23,14 +22,6 @@ def image_to_base64(img):
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode()
-
-def base64_to_image(b64_string):
-    """Convert base64 string to PIL Image."""
-    if b64_string and ',' in b64_string:
-        b64_data = b64_string.split(',')[1]
-        img_data = base64.b64decode(b64_data)
-        return Image.open(BytesIO(img_data))
-    return None
 
 def create_pdf_report(original_img, annotated_img, percentage, painted_px, total_px, sample_id, operator, notes):
     buffer = BytesIO()
@@ -80,19 +71,11 @@ def create_pdf_report(original_img, annotated_img, percentage, painted_px, total
     c.drawString(25*mm, y, "Original")
     c.drawString(110*mm, y, "Highlighted")
     y -= 58*mm
-    
-    # Original image
-    buf1 = BytesIO()
-    original_img.save(buf1, format='PNG')
-    buf1.seek(0)
-    c.drawImage(ImageReader(buf1), 25*mm, y, width=70*mm, height=55*mm, preserveAspectRatio=True)
-    
-    # Annotated image
-    buf2 = BytesIO()
-    annotated_img.save(buf2, format='PNG')
-    buf2.seek(0)
-    c.drawImage(ImageReader(buf2), 110*mm, y, width=70*mm, height=55*mm, preserveAspectRatio=True)
-    
+    for img, x in [(original_img, 25*mm), (annotated_img, 110*mm)]:
+        buf = BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        c.drawImage(ImageReader(buf), x, y, width=70*mm, height=55*mm, preserveAspectRatio=True)
     c.setFont("Helvetica", 8)
     c.setFillColor(colors.gray)
     c.drawCentredString(width/2, 15*mm, "Pearlite Phase Analyser")
@@ -184,7 +167,6 @@ with col1:
         <script>
         const canvas = document.getElementById('drawCanvas');
         const ctx = canvas.getContext('2d');
-        const bgImg = document.getElementById('bgImage');
         let isDrawing = false;
         let lastX = 0, lastY = 0;
         
@@ -224,18 +206,7 @@ with col1:
         function stopDraw() {{
             if (isDrawing) {{
                 isDrawing = false;
-                // Save canvas overlay
                 localStorage.setItem('pearliteCanvas', canvas.toDataURL());
-                
-                // Create combined image (background + drawing)
-                const combinedCanvas = document.createElement('canvas');
-                combinedCanvas.width = {cw};
-                combinedCanvas.height = {ch};
-                const combCtx = combinedCanvas.getContext('2d');
-                combCtx.drawImage(bgImg, 0, 0, {cw}, {ch});
-                combCtx.drawImage(canvas, 0, 0);
-                localStorage.setItem('pearliteAnnotated', combinedCanvas.toDataURL());
-                
                 updateCount();
             }}
         }}
@@ -250,6 +221,7 @@ with col1:
             document.getElementById('percentDisplay').textContent = pct + '%';
             document.getElementById('paintedDisplay').textContent = 'Painted: ' + count.toLocaleString() + ' px';
             
+            // Store for report
             localStorage.setItem('pearlitePct', pct);
             localStorage.setItem('pearlitePainted', count);
         }}
@@ -261,17 +233,6 @@ with col1:
         canvas.addEventListener('touchstart', startDraw);
         canvas.addEventListener('touchmove', draw);
         canvas.addEventListener('touchend', stopDraw);
-        
-        // Initial save of combined image
-        bgImg.onload = function() {{
-            const combinedCanvas = document.createElement('canvas');
-            combinedCanvas.width = {cw};
-            combinedCanvas.height = {ch};
-            const combCtx = combinedCanvas.getContext('2d');
-            combCtx.drawImage(bgImg, 0, 0, {cw}, {ch});
-            combCtx.drawImage(canvas, 0, 0);
-            localStorage.setItem('pearliteAnnotated', combinedCanvas.toDataURL());
-        }};
         
         updateCount();
         </script>
@@ -291,38 +252,17 @@ with col2:
     st.markdown("### Generate Report")
     
     if uploaded:
-        # Get data from localStorage using streamlit-javascript
-        pct_str = st_javascript("localStorage.getItem('pearlitePct')")
-        painted_str = st_javascript("localStorage.getItem('pearlitePainted')")
-        annotated_b64 = st_javascript("localStorage.getItem('pearliteAnnotated')")
+        st.markdown("Enter the percentage shown:")
+        report_pct = st.number_input("Pearlite %", min_value=0.0, max_value=100.0, value=0.0, step=0.01, label_visibility="collapsed")
         
-        pct = float(pct_str) if pct_str else 0.0
-        painted = int(painted_str) if painted_str else 0
         total = st.session_state.get('total', 0)
-        
-        st.markdown(f"**Pearlite Fraction**")
-        st.markdown(f"<span style='font-size:2rem;color:#27ae60;font-weight:bold;'>{pct:.2f}%</span>", unsafe_allow_html=True)
-        st.caption(f"Painted: {painted:,} px")
-        st.caption(f"Total: {total:,} px")
-        
-        st.markdown("---")
+        painted = int((report_pct / 100) * total) if total > 0 else 0
         
         if st.button("Generate PDF Report", type="primary", use_container_width=True):
             display_img = st.session_state.get('display_img')
-            
-            # Get annotated image from localStorage
-            annotated_img = None
-            if annotated_b64:
-                annotated_img = base64_to_image(annotated_b64)
-            
             if display_img:
-                if annotated_img is None:
-                    annotated_img = display_img
-                
                 pdf = create_pdf_report(
-                    display_img, 
-                    annotated_img.convert('RGB') if annotated_img else display_img,
-                    pct, painted, total,
+                    display_img, display_img, report_pct, painted, total,
                     sample_id or "N/A", operator or "N/A", notes or "N/A"
                 )
                 st.download_button("Download PDF", pdf, 
