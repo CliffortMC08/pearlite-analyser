@@ -1,10 +1,9 @@
 """
 Pearlite Phase Analyser - Web Application
-Image with canvas overlay using HTML positioning.
+Image with canvas overlay, auto-updating results.
 """
 
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 from io import BytesIO
@@ -118,17 +117,76 @@ with col1:
         
         stroke_color = "rgba(220,50,50,0.7)" if tool == "Brush" else "rgba(0,0,0,0)"
         eraser_mode = "true" if tool == "Eraser" else "false"
+        total_px = cw * ch
         
-        # Custom HTML canvas component with image background
+        # Custom HTML canvas with results display integrated
         canvas_html = f"""
-        <div id="canvas-container" style="position:relative; width:{cw}px; height:{ch}px; margin:0 auto; border:1px solid #ccc;">
-            <img src="data:image/png;base64,{img_b64}" style="position:absolute; top:0; left:0; width:{cw}px; height:{ch}px; z-index:1;">
-            <canvas id="drawCanvas" width="{cw}" height="{ch}" style="position:absolute; top:0; left:0; z-index:2; cursor:crosshair;"></canvas>
+        <style>
+            #canvas-container {{
+                position: relative;
+                width: {cw}px;
+                height: {ch}px;
+                margin: 0 auto;
+                border: 2px solid #27ae60;
+                border-radius: 5px;
+                overflow: hidden;
+            }}
+            #bgImage {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: {cw}px;
+                height: {ch}px;
+                z-index: 1;
+            }}
+            #drawCanvas {{
+                position: absolute;
+                top: 0;
+                left: 0;
+                z-index: 2;
+                cursor: crosshair;
+            }}
+            #resultsBar {{
+                background: linear-gradient(135deg, #2c3e50, #34495e);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 5px;
+                margin-top: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-family: Arial, sans-serif;
+            }}
+            #resultsBar .label {{
+                font-size: 14px;
+                color: #bdc3c7;
+            }}
+            #resultsBar .value {{
+                font-size: 28px;
+                font-weight: bold;
+                color: #2ecc71;
+            }}
+            #resultsBar .pixels {{
+                font-size: 12px;
+                color: #95a5a6;
+            }}
+        </style>
+        
+        <div id="canvas-container">
+            <img id="bgImage" src="data:image/png;base64,{img_b64}">
+            <canvas id="drawCanvas" width="{cw}" height="{ch}"></canvas>
         </div>
-        <div style="text-align:center; margin-top:10px;">
-            <span id="pixelCount" style="color:#27ae60; font-weight:bold;">Painted: 0 px</span>
+        
+        <div id="resultsBar">
+            <div>
+                <div class="label">Pearlite Fraction</div>
+                <div class="value" id="percentDisplay">0.00%</div>
+            </div>
+            <div style="text-align:right;">
+                <div class="pixels" id="paintedDisplay">Painted: 0 px</div>
+                <div class="pixels">Total: {total_px:,} px</div>
+            </div>
         </div>
-        <input type="hidden" id="canvasData" value="">
         
         <script>
         (function() {{
@@ -143,11 +201,13 @@ with col1:
             ctx.strokeStyle = '{stroke_color}';
             ctx.globalCompositeOperation = {eraser_mode} ? 'destination-out' : 'source-over';
             
-            // Load saved data
-            const saved = sessionStorage.getItem('pearliteCanvas');
+            const saved = sessionStorage.getItem('pearliteCanvas_{cw}_{ch}');
             if (saved) {{
                 const img = new Image();
-                img.onload = function() {{ ctx.drawImage(img, 0, 0); updateCount(); }};
+                img.onload = function() {{ 
+                    ctx.drawImage(img, 0, 0); 
+                    updateCount(); 
+                }};
                 img.src = saved;
             }}
             
@@ -177,9 +237,8 @@ with col1:
             function stopDraw() {{
                 if (isDrawing) {{
                     isDrawing = false;
-                    sessionStorage.setItem('pearliteCanvas', canvas.toDataURL());
+                    sessionStorage.setItem('pearliteCanvas_{cw}_{ch}', canvas.toDataURL());
                     updateCount();
-                    document.getElementById('canvasData').value = canvas.toDataURL();
                 }}
             }}
             
@@ -189,15 +248,13 @@ with col1:
                 for (let i = 3; i < imageData.data.length; i += 4) {{
                     if (imageData.data[i] > 50) count++;
                 }}
-                const pct = ((count / ({cw} * {ch})) * 100).toFixed(2);
-                document.getElementById('pixelCount').innerHTML = 
-                    'Painted: ' + count.toLocaleString() + ' px (' + pct + '%)';
+                const pct = ((count / {total_px}) * 100).toFixed(2);
+                document.getElementById('percentDisplay').textContent = pct + '%';
+                document.getElementById('paintedDisplay').textContent = 'Painted: ' + count.toLocaleString() + ' px';
                 
-                // Send to Streamlit
-                window.parent.postMessage({{
-                    type: 'streamlit:setComponentValue',
-                    value: {{ painted: count, percentage: pct, dataUrl: canvas.toDataURL() }}
-                }}, '*');
+                // Store in sessionStorage for Streamlit to read
+                sessionStorage.setItem('pearlitePct', pct);
+                sessionStorage.setItem('pearlitePainted', count);
             }}
             
             canvas.addEventListener('mousedown', startDraw);
@@ -207,56 +264,43 @@ with col1:
             canvas.addEventListener('touchstart', startDraw);
             canvas.addEventListener('touchmove', draw);
             canvas.addEventListener('touchend', stopDraw);
+            
+            updateCount();
         }})();
         </script>
         """
         
-        components.html(canvas_html, height=ch+50)
-        
-        # Get values from session
-        total_px = cw * ch
-        painted_px = st.session_state.get('painted_px', 0)
-        percentage = st.session_state.get('percentage', 0.0)
+        components.html(canvas_html, height=ch+100)
         
         st.session_state['display_img'] = display_img
-        st.session_state['cw'] = cw
-        st.session_state['ch'] = ch
         st.session_state['total'] = total_px
-        
-        # Manual input for percentage (since HTML can't send back to Streamlit easily)
-        st.markdown("---")
-        st.markdown("**Enter the percentage shown above:**")
-        manual_pct = st.number_input("Pearlite %", min_value=0.0, max_value=100.0, value=0.0, step=0.01)
-        st.session_state['pct'] = manual_pct
-        st.session_state['painted'] = int((manual_pct / 100) * total_px)
         
     else:
         st.info("Upload a microstructure image to begin")
-        manual_pct = 0.0
 
 with col2:
-    st.markdown("### Results")
-    pct = st.session_state.get('pct', 0.0)
-    painted = st.session_state.get('painted', 0)
-    total = st.session_state.get('total', 0)
-    
-    st.markdown(f"**Pearlite Fraction**")
-    st.markdown(f"<span style='font-size:2.2rem;color:#27ae60;font-weight:bold;'>{pct:.2f}%</span>", unsafe_allow_html=True)
-    st.caption(f"Painted: {painted:,} px")
-    st.caption(f"Total: {total:,} px")
-    
-    st.markdown("---")
-    
     if uploaded:
+        st.markdown("### For PDF Report")
+        st.markdown("Copy the percentage from the results bar below the image:")
+        
+        report_pct = st.number_input("Pearlite %", min_value=0.0, max_value=100.0, value=0.0, step=0.01, label_visibility="collapsed")
+        
+        total = st.session_state.get('total', 0)
+        painted = int((report_pct / 100) * total) if total > 0 else 0
+        
+        st.markdown("---")
+        
         if st.button("Generate PDF Report", type="primary", use_container_width=True):
             display_img = st.session_state.get('display_img')
             if display_img:
-                # For the report, we use the original image since we can't get canvas data back
                 pdf = create_pdf_report(
-                    display_img, display_img, pct, painted, total,
+                    display_img, display_img, report_pct, painted, total,
                     sample_id or "N/A", operator or "N/A", notes or "N/A"
                 )
                 st.download_button("Download PDF", pdf, 
                     f"pearlite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     "application/pdf", use_container_width=True)
                 st.success("Report ready!")
+    else:
+        st.markdown("### Results")
+        st.markdown("Upload an image to begin")
