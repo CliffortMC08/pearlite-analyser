@@ -1,6 +1,6 @@
 """
 Pearlite Phase Analyser - Web Application
-Image with canvas overlay, auto-updating results.
+Image with canvas overlay, auto-syncing results.
 """
 
 import streamlit as st
@@ -83,6 +83,11 @@ def create_pdf_report(original_img, annotated_img, percentage, painted_px, total
     buffer.seek(0)
     return buffer
 
+# Read percentage from URL params if available
+params = st.query_params
+url_pct = float(params.get("pct", 0))
+url_painted = int(params.get("painted", 0))
+
 # Title
 st.markdown("""
 <h1 style="text-align:center; color:#2c3e50; border-bottom:3px solid #27ae60; padding-bottom:10px;">
@@ -119,7 +124,6 @@ with col1:
         eraser_mode = "true" if tool == "Eraser" else "false"
         total_px = cw * ch
         
-        # Custom HTML canvas with results display integrated
         canvas_html = f"""
         <style>
             #canvas-container {{
@@ -131,21 +135,8 @@ with col1:
                 border-radius: 5px;
                 overflow: hidden;
             }}
-            #bgImage {{
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: {cw}px;
-                height: {ch}px;
-                z-index: 1;
-            }}
-            #drawCanvas {{
-                position: absolute;
-                top: 0;
-                left: 0;
-                z-index: 2;
-                cursor: crosshair;
-            }}
+            #bgImage {{ position: absolute; top: 0; left: 0; width: {cw}px; height: {ch}px; z-index: 1; }}
+            #drawCanvas {{ position: absolute; top: 0; left: 0; z-index: 2; cursor: crosshair; }}
             #resultsBar {{
                 background: linear-gradient(135deg, #2c3e50, #34495e);
                 color: white;
@@ -157,19 +148,20 @@ with col1:
                 align-items: center;
                 font-family: Arial, sans-serif;
             }}
-            #resultsBar .label {{
-                font-size: 14px;
-                color: #bdc3c7;
-            }}
-            #resultsBar .value {{
-                font-size: 28px;
+            .label {{ font-size: 14px; color: #bdc3c7; }}
+            .value {{ font-size: 28px; font-weight: bold; color: #2ecc71; }}
+            .pixels {{ font-size: 12px; color: #95a5a6; }}
+            #syncBtn {{
+                background: #27ae60;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 5px;
+                cursor: pointer;
                 font-weight: bold;
-                color: #2ecc71;
+                margin-top: 10px;
             }}
-            #resultsBar .pixels {{
-                font-size: 12px;
-                color: #95a5a6;
-            }}
+            #syncBtn:hover {{ background: #2ecc71; }}
         </style>
         
         <div id="canvas-container">
@@ -188,89 +180,91 @@ with col1:
             </div>
         </div>
         
+        <div style="text-align:center;">
+            <button id="syncBtn" onclick="syncResults()">Sync Results for Report</button>
+        </div>
+        
         <script>
-        (function() {{
-            const canvas = document.getElementById('drawCanvas');
-            const ctx = canvas.getContext('2d');
-            let isDrawing = false;
-            let lastX = 0, lastY = 0;
-            
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.lineWidth = {brush_size};
-            ctx.strokeStyle = '{stroke_color}';
-            ctx.globalCompositeOperation = {eraser_mode} ? 'destination-out' : 'source-over';
-            
-            const saved = sessionStorage.getItem('pearliteCanvas_{cw}_{ch}');
-            if (saved) {{
-                const img = new Image();
-                img.onload = function() {{ 
-                    ctx.drawImage(img, 0, 0); 
-                    updateCount(); 
-                }};
-                img.src = saved;
+        const canvas = document.getElementById('drawCanvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+        let currentPct = 0;
+        let currentPainted = 0;
+        
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = {brush_size};
+        ctx.strokeStyle = '{stroke_color}';
+        ctx.globalCompositeOperation = {eraser_mode} ? 'destination-out' : 'source-over';
+        
+        const saved = sessionStorage.getItem('pearliteCanvas_{cw}_{ch}');
+        if (saved) {{
+            const img = new Image();
+            img.onload = function() {{ ctx.drawImage(img, 0, 0); updateCount(); }};
+            img.src = saved;
+        }}
+        
+        function getPos(e) {{
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+            const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+            return [x, y];
+        }}
+        
+        function startDraw(e) {{ isDrawing = true; [lastX, lastY] = getPos(e); }}
+        
+        function draw(e) {{
+            if (!isDrawing) return;
+            e.preventDefault();
+            const [x, y] = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            [lastX, lastY] = [x, y];
+        }}
+        
+        function stopDraw() {{
+            if (isDrawing) {{
+                isDrawing = false;
+                sessionStorage.setItem('pearliteCanvas_{cw}_{ch}', canvas.toDataURL());
+                updateCount();
             }}
-            
-            function getPos(e) {{
-                const rect = canvas.getBoundingClientRect();
-                const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-                const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-                return [x, y];
+        }}
+        
+        function updateCount() {{
+            const imageData = ctx.getImageData(0, 0, {cw}, {ch});
+            let count = 0;
+            for (let i = 3; i < imageData.data.length; i += 4) {{
+                if (imageData.data[i] > 50) count++;
             }}
-            
-            function startDraw(e) {{
-                isDrawing = true;
-                [lastX, lastY] = getPos(e);
-            }}
-            
-            function draw(e) {{
-                if (!isDrawing) return;
-                e.preventDefault();
-                const [x, y] = getPos(e);
-                ctx.beginPath();
-                ctx.moveTo(lastX, lastY);
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                [lastX, lastY] = [x, y];
-            }}
-            
-            function stopDraw() {{
-                if (isDrawing) {{
-                    isDrawing = false;
-                    sessionStorage.setItem('pearliteCanvas_{cw}_{ch}', canvas.toDataURL());
-                    updateCount();
-                }}
-            }}
-            
-            function updateCount() {{
-                const imageData = ctx.getImageData(0, 0, {cw}, {ch});
-                let count = 0;
-                for (let i = 3; i < imageData.data.length; i += 4) {{
-                    if (imageData.data[i] > 50) count++;
-                }}
-                const pct = ((count / {total_px}) * 100).toFixed(2);
-                document.getElementById('percentDisplay').textContent = pct + '%';
-                document.getElementById('paintedDisplay').textContent = 'Painted: ' + count.toLocaleString() + ' px';
-                
-                // Store in sessionStorage for Streamlit to read
-                sessionStorage.setItem('pearlitePct', pct);
-                sessionStorage.setItem('pearlitePainted', count);
-            }}
-            
-            canvas.addEventListener('mousedown', startDraw);
-            canvas.addEventListener('mousemove', draw);
-            canvas.addEventListener('mouseup', stopDraw);
-            canvas.addEventListener('mouseout', stopDraw);
-            canvas.addEventListener('touchstart', startDraw);
-            canvas.addEventListener('touchmove', draw);
-            canvas.addEventListener('touchend', stopDraw);
-            
-            updateCount();
-        }})();
+            currentPainted = count;
+            currentPct = ((count / {total_px}) * 100).toFixed(2);
+            document.getElementById('percentDisplay').textContent = currentPct + '%';
+            document.getElementById('paintedDisplay').textContent = 'Painted: ' + count.toLocaleString() + ' px';
+        }}
+        
+        function syncResults() {{
+            const url = new URL(window.parent.location.href);
+            url.searchParams.set('pct', currentPct);
+            url.searchParams.set('painted', currentPainted);
+            window.parent.location.href = url.toString();
+        }}
+        
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDraw);
+        canvas.addEventListener('mouseout', stopDraw);
+        canvas.addEventListener('touchstart', startDraw);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDraw);
+        
+        updateCount();
         </script>
         """
         
-        components.html(canvas_html, height=ch+100)
+        components.html(canvas_html, height=ch+130)
         
         st.session_state['display_img'] = display_img
         st.session_state['total'] = total_px
@@ -279,28 +273,32 @@ with col1:
         st.info("Upload a microstructure image to begin")
 
 with col2:
+    st.markdown("### Results")
+    
+    total = st.session_state.get('total', 0)
+    pct = url_pct if url_pct > 0 else 0.0
+    painted = url_painted if url_painted > 0 else 0
+    
+    st.markdown(f"**Pearlite Fraction**")
+    st.markdown(f"<span style='font-size:2.5rem;color:#27ae60;font-weight:bold;'>{pct:.2f}%</span>", unsafe_allow_html=True)
+    st.caption(f"Painted: {painted:,} px")
+    st.caption(f"Total: {total:,} px")
+    
+    st.markdown("---")
+    
     if uploaded:
-        st.markdown("### For PDF Report")
-        st.markdown("Copy the percentage from the results bar below the image:")
-        
-        report_pct = st.number_input("Pearlite %", min_value=0.0, max_value=100.0, value=0.0, step=0.01, label_visibility="collapsed")
-        
-        total = st.session_state.get('total', 0)
-        painted = int((report_pct / 100) * total) if total > 0 else 0
-        
-        st.markdown("---")
-        
         if st.button("Generate PDF Report", type="primary", use_container_width=True):
             display_img = st.session_state.get('display_img')
-            if display_img:
+            if display_img and pct > 0:
                 pdf = create_pdf_report(
-                    display_img, display_img, report_pct, painted, total,
+                    display_img, display_img, pct, painted, total,
                     sample_id or "N/A", operator or "N/A", notes or "N/A"
                 )
                 st.download_button("Download PDF", pdf, 
                     f"pearlite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                     "application/pdf", use_container_width=True)
                 st.success("Report ready!")
+            elif pct == 0:
+                st.warning("Click 'Sync Results' below the image first")
     else:
-        st.markdown("### Results")
-        st.markdown("Upload an image to begin")
+        st.info("Upload an image to begin")
