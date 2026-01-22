@@ -1,8 +1,10 @@
 """
 Pearlite Phase Analyser - Web Application
+Quantify pearlite phases in steel microstructure images.
 """
 
 import streamlit as st
+from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 from io import BytesIO
@@ -12,246 +14,290 @@ from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.lib.utils import ImageReader
-import base64
 
-from streamlit_drawable_canvas import st_canvas
+# Page config
+st.set_page_config(
+    page_title="Pearlite Phase Analyser",
+    layout="wide"
+)
 
-st.set_page_config(page_title="Pearlite Phase Analyser", page_icon="", layout="wide")
-
+# Simple clean CSS
 st.markdown("""
 <style>
-    .stApp { background-color: #f5f5f5; }
-    .main-header {
+    .main-title {
         text-align: center;
-        padding: 20px;
-        background-color: #2c3e50;
-        color: white;
-        border-radius: 10px;
+        color: #2c3e50;
+        font-size: 2rem;
+        font-weight: bold;
+        padding: 10px 0;
+        border-bottom: 3px solid #27ae60;
         margin-bottom: 20px;
     }
-    .main-header h1 { color: white !important; font-size: 2rem; margin: 0; }
-    .main-header p { color: #ecf0f1 !important; margin-top: 5px; }
-    .results-box {
-        background-color: #2c3e50;
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
+    .subtitle {
         text-align: center;
-        margin: 10px 0;
+        color: #7f8c8d;
+        margin-bottom: 20px;
     }
-    .results-box h3 { color: #ecf0f1 !important; margin-bottom: 10px; }
-    .big-percent { font-size: 3rem; font-weight: bold; color: #2ecc71 !important; }
-    .pixel-text { color: #bdc3c7 !important; font-size: 0.9rem; margin-top: 10px; }
-    .section-title { color: #2c3e50 !important; font-size: 1.1rem; font-weight: bold; margin: 10px 0; }
-    div[data-testid="stSidebar"] { background-color: #ecf0f1; }
-    div[data-testid="stSidebar"] h2, div[data-testid="stSidebar"] h3, 
-    div[data-testid="stSidebar"] label { color: #2c3e50 !important; }
-    
-    .canvas-wrapper {
-        position: relative;
-        display: inline-block;
-        margin: 0 auto;
+    .result-label {
+        color: #2c3e50;
+        font-weight: bold;
+        font-size: 1.1rem;
     }
-    .canvas-wrapper img {
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 1;
-        pointer-events: none;
+    .result-value {
+        color: #27ae60;
+        font-size: 2.5rem;
+        font-weight: bold;
     }
-    .canvas-wrapper canvas {
-        position: relative;
-        z-index: 2;
+    .info-text {
+        color: #7f8c8d;
+        font-size: 0.9rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
-def image_to_data_url(img):
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    return f"data:image/png;base64,{base64.b64encode(buffered.getvalue()).decode()}"
-
-def create_pdf(orig_img, ann_img, pct, painted, total, info):
-    buf = BytesIO()
-    c = pdf_canvas.Canvas(buf, pagesize=A4)
-    w, h = A4
-    c.setFont("Helvetica-Bold", 24)
-    c.setFillColor(colors.HexColor("#2c3e50"))
-    c.drawCentredString(w/2, h-40*mm, "Pearlite Phase Analyser Report")
-    c.setStrokeColor(colors.HexColor("#2ecc71"))
-    c.setLineWidth(3)
-    c.line(30*mm, h-45*mm, w-30*mm, h-45*mm)
+def create_pdf_report(original_img, annotated_img, percentage, painted_px, total_px, sample_id, operator, notes):
+    """Generate PDF report."""
+    buffer = BytesIO()
+    c = pdf_canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
     
-    y = h - 60*mm
-    c.setFont("Helvetica-Bold", 14)
+    # Title
+    c.setFont("Helvetica-Bold", 22)
+    c.setFillColor(colors.HexColor("#2c3e50"))
+    c.drawCentredString(width/2, height - 35*mm, "Pearlite Phase Analyser Report")
+    
+    # Green line
+    c.setStrokeColor(colors.HexColor("#27ae60"))
+    c.setLineWidth(2)
+    c.line(25*mm, height - 40*mm, width - 25*mm, height - 40*mm)
+    
+    # Sample Information
+    y = height - 55*mm
+    c.setFont("Helvetica-Bold", 12)
     c.setFillColor(colors.HexColor("#2c3e50"))
     c.drawString(25*mm, y, "Sample Information")
-    c.setFont("Helvetica", 11)
-    c.setFillColor(colors.black)
-    for lbl, val in [("Sample ID", info['sample_id']), ("Operator", info['operator']), 
-                      ("Date", datetime.now().strftime('%Y-%m-%d %H:%M')), ("Notes", info['notes'])]:
-        y -= 6*mm
-        c.drawString(25*mm, y, f"{lbl}: {val}")
     
-    y -= 15*mm
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("Helvetica", 10)
+    c.setFillColor(colors.black)
+    y -= 7*mm
+    c.drawString(25*mm, y, f"Sample ID: {sample_id}")
+    y -= 5*mm
+    c.drawString(25*mm, y, f"Operator: {operator}")
+    y -= 5*mm
+    c.drawString(25*mm, y, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    y -= 5*mm
+    c.drawString(25*mm, y, f"Notes: {notes}")
+    
+    # Results
+    y -= 12*mm
+    c.setFont("Helvetica-Bold", 12)
     c.setFillColor(colors.HexColor("#2c3e50"))
     c.drawString(25*mm, y, "Results")
-    y -= 10*mm
-    c.setFont("Helvetica-Bold", 13)
-    c.setFillColor(colors.black)
-    c.drawString(25*mm, y, "Pearlite Fraction:")
-    c.setFont("Helvetica-Bold", 20)
-    c.setFillColor(colors.HexColor("#2ecc71"))
-    c.drawString(70*mm, y, f"{pct:.2f}%")
     
-    y -= 15*mm
-    c.setFont("Helvetica-Bold", 14)
-    c.setFillColor(colors.HexColor("#2c3e50"))
-    c.drawString(25*mm, y, "Micrographs")
     y -= 8*mm
     c.setFont("Helvetica", 10)
     c.setFillColor(colors.black)
+    c.drawString(25*mm, y, "Pearlite Fraction:")
+    c.setFont("Helvetica-Bold", 16)
+    c.setFillColor(colors.HexColor("#27ae60"))
+    c.drawString(60*mm, y, f"{percentage:.2f}%")
+    
+    y -= 6*mm
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.gray)
+    c.drawString(25*mm, y, f"Painted: {painted_px:,} px  |  Total: {total_px:,} px")
+    
+    # Images
+    y -= 12*mm
+    c.setFont("Helvetica-Bold", 12)
+    c.setFillColor(colors.HexColor("#2c3e50"))
+    c.drawString(25*mm, y, "Micrographs")
+    
+    y -= 6*mm
+    c.setFont("Helvetica", 9)
+    c.setFillColor(colors.black)
     c.drawString(25*mm, y, "Original")
     c.drawString(110*mm, y, "Highlighted")
-    y -= 65*mm
     
-    for img, x in [(orig_img, 25*mm), (ann_img, 110*mm)]:
-        b = BytesIO()
-        img.save(b, format='PNG')
-        b.seek(0)
-        c.drawImage(ImageReader(b), x, y, width=75*mm, height=60*mm, preserveAspectRatio=True)
+    img_w, img_h = 70*mm, 55*mm
+    y -= img_h + 3*mm
+    
+    # Original image
+    buf1 = BytesIO()
+    original_img.save(buf1, format='PNG')
+    buf1.seek(0)
+    c.drawImage(ImageReader(buf1), 25*mm, y, width=img_w, height=img_h, preserveAspectRatio=True)
+    
+    # Annotated image
+    buf2 = BytesIO()
+    annotated_img.save(buf2, format='PNG')
+    buf2.seek(0)
+    c.drawImage(ImageReader(buf2), 110*mm, y, width=img_w, height=img_h, preserveAspectRatio=True)
+    
+    # Footer
+    c.setFont("Helvetica", 8)
+    c.setFillColor(colors.gray)
+    c.drawCentredString(width/2, 15*mm, "Pearlite Phase Analyser")
     
     c.save()
-    buf.seek(0)
-    return buf
+    buffer.seek(0)
+    return buffer
 
-def calc_pct(canvas_result, size):
-    if canvas_result is None or canvas_result.image_data is None:
-        return 0.0, 0, size[0]*size[1]
-    alpha = canvas_result.image_data[:,:,3]
-    painted = int(np.sum(alpha > 50))
-    total = size[0] * size[1]
-    return (painted/total)*100 if total > 0 else 0.0, painted, total
+def calculate_percentage(canvas_data, total_pixels):
+    """Calculate percentage of painted area."""
+    if canvas_data is None or canvas_data.image_data is None:
+        return 0.0, 0
+    
+    # Count pixels with alpha > threshold (painted pixels)
+    alpha_channel = canvas_data.image_data[:, :, 3]
+    painted_pixels = int(np.sum(alpha_channel > 50))
+    
+    if total_pixels > 0:
+        percentage = (painted_pixels / total_pixels) * 100
+    else:
+        percentage = 0.0
+    
+    return percentage, painted_pixels
 
-# Header
-st.markdown('''
-<div class="main-header">
-    <h1>Pearlite Phase Analyser</h1>
-    <p>Upload a microstructure image and paint over pearlite regions</p>
-</div>
-''', unsafe_allow_html=True)
+# ============ MAIN APP ============
 
-# Sidebar
+# Title
+st.markdown('<div class="main-title">Pearlite Phase Analyser</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Upload a microstructure image, paint pearlite regions, and calculate phase fraction</div>', unsafe_allow_html=True)
+
+# Sidebar - Tools
 with st.sidebar:
-    st.markdown("## Drawing Tools")
-    tool = st.radio("Select Tool", ["Brush (Red)", "Eraser"])
-    stroke_color = "rgba(220,50,50,0.7)" if "Brush" in tool else "rgba(0,0,0,0)"
-    brush_size = st.slider("Brush Size (px)", 2, 50, 15)
+    st.header("Tools")
+    
+    tool_mode = st.radio("Drawing Tool", ["Brush (Highlight)", "Eraser"])
+    
+    if "Brush" in tool_mode:
+        stroke_color = "rgba(220, 50, 50, 0.7)"  # Semi-transparent red
+    else:
+        stroke_color = "rgba(0, 0, 0, 0)"  # Transparent for eraser
+    
+    brush_size = st.slider("Brush Size", min_value=2, max_value=50, value=15)
     
     st.markdown("---")
-    st.markdown("## Report Information")
-    sample_id = st.text_input("Sample ID", placeholder="e.g. STEEL-001")
-    operator = st.text_input("Operator", placeholder="Your name")
-    notes = st.text_area("Notes", placeholder="Observations...", height=80)
-    
-    st.markdown("---")
-    st.markdown("## Instructions")
-    st.markdown("""
-    1. Upload microstructure image
-    2. Paint pearlite regions in red
-    3. Use eraser to fix mistakes
-    4. Generate PDF report
-    """)
+    st.header("Report Info")
+    sample_id = st.text_input("Sample ID", value="", placeholder="Enter sample ID")
+    operator = st.text_input("Operator", value="", placeholder="Enter operator name")
+    notes = st.text_area("Notes", value="", placeholder="Enter notes", height=100)
 
 # Main content
-col1, col2 = st.columns([3, 1])
+col_main, col_results = st.columns([3, 1])
 
-with col1:
-    uploaded = st.file_uploader("Upload Microstructure Image", type=['png','jpg','jpeg','bmp','tiff'])
+with col_main:
+    # File uploader
+    uploaded_file = st.file_uploader("Upload Microstructure Image", type=["png", "jpg", "jpeg", "bmp", "tiff"])
     
-    if uploaded:
-        img = Image.open(uploaded).convert('RGB')
-        max_w, max_h = 650, 450
-        scale = min(max_w/img.width, max_h/img.height, 1.0)
-        cw, ch = int(img.width*scale), int(img.height*scale)
-        display_img = img.resize((cw, ch), Image.Resampling.LANCZOS)
+    if uploaded_file is not None:
+        # Load image
+        original_image = Image.open(uploaded_file).convert("RGB")
         
-        # Convert image to base64 for CSS background
-        img_data_url = image_to_data_url(display_img)
+        # Resize for display
+        max_width, max_height = 700, 500
+        img_width, img_height = original_image.size
+        scale = min(max_width / img_width, max_height / img_height, 1.0)
+        canvas_width = int(img_width * scale)
+        canvas_height = int(img_height * scale)
         
-        st.markdown('<p class="section-title">Paint on the image below (red = pearlite)</p>', unsafe_allow_html=True)
+        display_image = original_image.resize((canvas_width, canvas_height), Image.Resampling.LANCZOS)
         
-        # Custom CSS to show image as canvas background
-        st.markdown(f"""
-        <style>
-            canvas[class*="drawable"] {{
-                background-image: url('{img_data_url}') !important;
-                background-size: cover !important;
-                background-repeat: no-repeat !important;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
+        # Show original image as reference
+        st.write("**Reference Image** (view while drawing below)")
+        st.image(display_image, width=canvas_width)
         
-        # Center the canvas
-        _, col_center, _ = st.columns([1, 6, 1])
-        with col_center:
-            canvas_result = st_canvas(
-                fill_color="rgba(0,0,0,0)",
-                stroke_width=brush_size,
-                stroke_color=stroke_color,
-                background_color="rgba(255,255,255,0)",
-                height=ch,
-                width=cw,
-                drawing_mode="freedraw",
-                key="canvas",
-            )
+        st.write("**Draw Here** (paint pearlite regions in red)")
         
-        pct, painted, total = calc_pct(canvas_result, (cw, ch))
-        st.session_state['display_img'] = display_img
+        # Drawing canvas
+        canvas_result = st_canvas(
+            fill_color="rgba(0, 0, 0, 0)",
+            stroke_width=brush_size,
+            stroke_color=stroke_color,
+            background_color="#f0f0f0",
+            height=canvas_height,
+            width=canvas_width,
+            drawing_mode="freedraw",
+            key="drawing_canvas",
+        )
+        
+        # Calculate percentage
+        total_pixels = canvas_width * canvas_height
+        percentage, painted_pixels = calculate_percentage(canvas_result, total_pixels)
+        
+        # Store in session state for report
+        st.session_state['display_image'] = display_image
         st.session_state['canvas_result'] = canvas_result
+        st.session_state['percentage'] = percentage
+        st.session_state['painted_pixels'] = painted_pixels
+        st.session_state['total_pixels'] = total_pixels
+        
     else:
-        st.info("Upload a microstructure image to begin analysis")
-        pct, painted, total = 0.0, 0, 0
-        canvas_result = None
-        display_img = None
+        st.info("Please upload a microstructure image to begin.")
+        percentage = 0.0
+        painted_pixels = 0
+        total_pixels = 0
 
-with col2:
-    st.markdown(f'''
-    <div class="results-box">
-        <h3>Pearlite Fraction</h3>
-        <div class="big-percent">{pct:.2f}%</div>
-        <div class="pixel-text">
-            Painted: {painted:,} px<br>
-            Total: {total:,} px
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+with col_results:
+    st.markdown("### Results")
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f'<p class="result-label">Pearlite Fraction</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="result-value">{percentage:.2f}%</p>', unsafe_allow_html=True)
     
-    if uploaded:
+    st.markdown(f'<p class="info-text">Painted: {painted_pixels:,} px</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="info-text">Total: {total_pixels:,} px</p>', unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # Generate Report Button
+    if uploaded_file is not None:
         if st.button("Generate PDF Report", type="primary", use_container_width=True):
-            display_img = st.session_state.get('display_img')
+            display_image = st.session_state.get('display_image')
             canvas_result = st.session_state.get('canvas_result')
+            pct = st.session_state.get('percentage', 0.0)
+            painted = st.session_state.get('painted_pixels', 0)
+            total = st.session_state.get('total_pixels', 0)
             
-            if display_img:
-                if canvas_result and canvas_result.image_data is not None:
-                    arr = canvas_result.image_data.astype(np.uint8)
-                    overlay = Image.fromarray(arr, 'RGBA')
-                    annotated = display_img.copy().convert('RGBA')
-                    annotated = Image.alpha_composite(annotated, overlay).convert('RGB')
+            if display_image is not None:
+                # Create annotated image
+                if canvas_result is not None and canvas_result.image_data is not None:
+                    canvas_array = canvas_result.image_data.astype(np.uint8)
+                    canvas_img = Image.fromarray(canvas_array, 'RGBA')
+                    annotated = display_image.copy().convert('RGBA')
+                    annotated = Image.alpha_composite(annotated, canvas_img)
+                    annotated = annotated.convert('RGB')
                 else:
-                    annotated = display_img
+                    annotated = display_image
                 
-                info = {'sample_id': sample_id or 'N/A', 'operator': operator or 'N/A', 'notes': notes or 'N/A'}
-                pdf = create_pdf(display_img, annotated, pct, painted, total, info)
+                # Generate PDF
+                pdf_buffer = create_pdf_report(
+                    display_image,
+                    annotated,
+                    pct,
+                    painted,
+                    total,
+                    sample_id or "N/A",
+                    operator or "N/A",
+                    notes or "N/A"
+                )
                 
+                # Download button
                 st.download_button(
-                    "Download PDF Report", 
-                    pdf, 
-                    f"pearlite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf", 
-                    "application/pdf", 
+                    label="Download PDF",
+                    data=pdf_buffer,
+                    file_name=f"pearlite_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                    mime="application/pdf",
                     use_container_width=True
                 )
                 st.success("Report generated!")
+    
+    st.markdown("---")
+    st.markdown("**Instructions:**")
+    st.markdown("""
+    1. Upload image
+    2. Look at reference
+    3. Draw on canvas below
+    4. Match pearlite regions
+    5. Generate report
+    """)
