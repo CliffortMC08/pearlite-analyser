@@ -124,19 +124,19 @@ st.markdown("""
         line-height: 1.5;
     }
     
-    /* Button styling */
+    /* Button styling - matches tool badge */
     .stButton > button {
-        background: #374151 !important;
-        color: white !important;
-        border: none !important;
+        background: #fef2f2 !important;
+        color: #dc2626 !important;
+        border: 1px solid #fecaca !important;
         border-radius: 8px !important;
         padding: 10px 20px !important;
         font-weight: 600 !important;
         transition: all 0.2s !important;
     }
     .stButton > button:hover {
-        background: #4b5563 !important;
-        box-shadow: 0 4px 12px rgba(55, 65, 81, 0.25) !important;
+        background: #fee2e2 !important;
+        border-color: #fca5a5 !important;
     }
     
     /* Slider styling */
@@ -185,17 +185,6 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    st.markdown("### ⌨️ Shortcuts")
-    st.markdown("""
-    <div class="info-card">
-        <p>
-        <strong>B</strong> - Brush tool<br>
-        <strong>E</strong> - Eraser tool<br>
-        <strong>[ ]</strong> - Brush size<br>
-        <strong>C</strong> - Clear canvas
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
 # Main content
 uploaded = st.file_uploader(
@@ -521,16 +510,6 @@ if uploaded:
     canvas.addEventListener('touchstart', startDraw);
     canvas.addEventListener('touchmove', draw);
     canvas.addEventListener('touchend', stopDraw);
-    
-    // Keyboard shortcuts
-    document.addEventListener('keydown', function(e) {{
-        if (e.key === 'c' || e.key === 'C') {{
-            ctx.clearRect(0, 0, {cw}, {ch});
-            localStorage.removeItem('pearliteCanvas');
-            history = [];
-            updateCount();
-        }}
-    }});
     
     updateCount();
     </script>
