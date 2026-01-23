@@ -20,7 +20,7 @@ def image_to_base64(img):
     img.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode()
 
-# Professional CSS styling
+# Professional CSS styling - Grey/White theme
 st.markdown("""
 <style>
     /* Hide Streamlit branding */
@@ -29,51 +29,53 @@ st.markdown("""
     
     /* Main background */
     .stApp {
-        background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+        background: #f8f9fa;
     }
     
     /* Sidebar styling */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        background: #ffffff;
+        border-right: 1px solid #e5e7eb;
         padding-top: 1rem;
     }
     [data-testid="stSidebar"] * {
-        color: #e8e8e8 !important;
+        color: #374151 !important;
     }
     [data-testid="stSidebar"] .stRadio label {
-        background: rgba(255,255,255,0.05);
+        background: #f3f4f6;
         padding: 10px 15px;
         border-radius: 8px;
         margin: 3px 0;
         transition: all 0.2s;
     }
     [data-testid="stSidebar"] .stRadio label:hover {
-        background: rgba(255,255,255,0.1);
+        background: #e5e7eb;
     }
     
     /* Header styling */
     .main-header {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        background: #ffffff;
         padding: 25px 40px;
-        border-radius: 16px;
+        border-radius: 12px;
         margin-bottom: 25px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        border: 1px solid #e5e7eb;
     }
     .main-header h1 {
-        color: #ffffff;
-        font-size: 2.2rem;
+        color: #1f2937;
+        font-size: 2rem;
         font-weight: 700;
         margin: 0;
         letter-spacing: -0.5px;
     }
     .main-header p {
-        color: #94a3b8;
+        color: #6b7280;
         font-size: 1rem;
         margin: 8px 0 0 0;
     }
     .header-badge {
         display: inline-block;
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        background: #374151;
         color: white;
         padding: 4px 12px;
         border-radius: 20px;
@@ -81,51 +83,6 @@ st.markdown("""
         font-weight: 600;
         margin-left: 12px;
         vertical-align: middle;
-    }
-    
-    /* Upload zone styling */
-    .upload-zone {
-        background: #ffffff;
-        border: 2px dashed #cbd5e1;
-        border-radius: 16px;
-        padding: 40px;
-        text-align: center;
-        transition: all 0.3s ease;
-        margin-bottom: 20px;
-    }
-    .upload-zone:hover {
-        border-color: #10b981;
-        background: #f0fdf4;
-    }
-    .upload-icon {
-        font-size: 3rem;
-        margin-bottom: 15px;
-    }
-    .upload-text {
-        color: #64748b;
-        font-size: 1.1rem;
-        margin-bottom: 15px;
-    }
-    .upload-btn {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        color: white;
-        padding: 12px 30px;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 1rem;
-        border: none;
-        cursor: pointer;
-        display: inline-block;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .upload-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
-    }
-    .upload-formats {
-        color: #94a3b8;
-        font-size: 0.85rem;
-        margin-top: 12px;
     }
     
     /* Hide default file uploader styling */
@@ -137,54 +94,54 @@ st.markdown("""
     }
     [data-testid="stFileUploader"] section {
         background: #ffffff;
-        border: 2px dashed #cbd5e1;
-        border-radius: 16px;
-        padding: 30px;
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 25px;
         transition: all 0.3s ease;
     }
     [data-testid="stFileUploader"] section:hover {
-        border-color: #10b981;
-        background: #f0fdf4;
+        border-color: #9ca3af;
+        background: #f9fafb;
     }
     
     /* Card styling */
     .info-card {
-        background: #ffffff;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        background: #f9fafb;
+        border-radius: 10px;
+        padding: 15px;
+        border: 1px solid #e5e7eb;
         margin-bottom: 15px;
     }
     .info-card h4 {
-        color: #1e293b;
+        color: #1f2937;
         margin: 0 0 10px 0;
         font-size: 1rem;
     }
     .info-card p {
-        color: #64748b;
+        color: #6b7280;
         margin: 0;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         line-height: 1.5;
     }
     
     /* Button styling */
     .stButton > button {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%) !important;
+        background: #374151 !important;
         color: white !important;
         border: none !important;
-        border-radius: 10px !important;
-        padding: 12px 24px !important;
+        border-radius: 8px !important;
+        padding: 10px 20px !important;
         font-weight: 600 !important;
         transition: all 0.2s !important;
     }
     .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(26, 26, 46, 0.3) !important;
+        background: #4b5563 !important;
+        box-shadow: 0 4px 12px rgba(55, 65, 81, 0.25) !important;
     }
     
     /* Slider styling */
     .stSlider > div > div {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        background: #6b7280 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -283,22 +240,24 @@ if uploaded:
         
         * {{
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            box-sizing: border-box;
         }}
         
         .canvas-wrapper {{
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 15px;
         }}
         
         #canvas-container {{
             position: relative;
             width: {cw}px;
             height: {ch}px;
-            border-radius: 12px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
         }}
         
         #bgImage {{
@@ -320,76 +279,79 @@ if uploaded:
         
         .results-panel {{
             width: {cw}px;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border-radius: 16px;
-            padding: 25px 35px;
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 20px 25px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #e5e7eb;
         }}
         
         .result-main {{
             text-align: left;
+            flex-shrink: 0;
         }}
         
         .result-label {{
-            color: #94a3b8;
-            font-size: 14px;
+            color: #6b7280;
+            font-size: 12px;
             font-weight: 500;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 5px;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
         }}
         
         .result-value {{
-            color: #10b981;
-            font-size: 48px;
+            color: #1f2937;
+            font-size: 32px;
             font-weight: 700;
             line-height: 1;
         }}
         
         .result-details {{
             text-align: right;
+            flex-shrink: 0;
         }}
         
         .detail-row {{
-            color: #94a3b8;
-            font-size: 14px;
-            margin: 4px 0;
+            color: #6b7280;
+            font-size: 13px;
+            margin: 3px 0;
         }}
         
         .detail-value {{
-            color: #e2e8f0;
+            color: #374151;
             font-weight: 600;
         }}
         
         .progress-bar {{
             width: {cw}px;
-            height: 8px;
-            background: #e2e8f0;
-            border-radius: 4px;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
             overflow: hidden;
         }}
         
         .progress-fill {{
             height: 100%;
-            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-            border-radius: 4px;
+            background: #6b7280;
+            border-radius: 3px;
             transition: width 0.3s ease;
             width: 0%;
         }}
         
         .toolbar {{
             width: {cw}px;
-            background: white;
-            border-radius: 12px;
-            padding: 12px 20px;
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 10px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-            margin-bottom: 5px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #e5e7eb;
         }}
         
         .tool-indicator {{
@@ -399,23 +361,23 @@ if uploaded:
         }}
         
         .tool-badge {{
-            background: {"#fee2e2" if tool == "Brush" else "#e0e7ff"};
-            color: {"#dc2626" if tool == "Brush" else "#4f46e5"};
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 13px;
+            background: {"#fef2f2" if tool == "Brush" else "#f3f4f6"};
+            color: {"#dc2626" if tool == "Brush" else "#374151"};
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
             font-weight: 600;
         }}
         
         .size-indicator {{
-            color: #64748b;
-            font-size: 13px;
+            color: #6b7280;
+            font-size: 12px;
         }}
         
         .image-name {{
-            color: #94a3b8;
-            font-size: 13px;
-            max-width: 200px;
+            color: #9ca3af;
+            font-size: 12px;
+            max-width: 180px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -577,24 +539,24 @@ if uploaded:
     components.html(canvas_html, height=ch + 220)
 
 else:
-    # Beautiful upload prompt
+    # Clean upload prompt
     st.markdown("""
     <div style="
-        background: white;
-        border: 2px dashed #cbd5e1;
-        border-radius: 20px;
-        padding: 60px 40px;
+        background: #ffffff;
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 50px 40px;
         text-align: center;
         margin: 20px auto;
-        max-width: 600px;
+        max-width: 500px;
     ">
-        <div style="font-size: 4rem; margin-bottom: 20px;">📤</div>
-        <h3 style="color: #1e293b; margin-bottom: 10px; font-size: 1.5rem;">Upload Your Micrograph</h3>
-        <p style="color: #64748b; margin-bottom: 25px; font-size: 1rem;">
-            Drag and drop your microstructure image here, or click the button above to browse
+        <div style="font-size: 3rem; margin-bottom: 15px;">📤</div>
+        <h3 style="color: #1f2937; margin-bottom: 8px; font-size: 1.3rem; font-weight: 600;">Upload Your Micrograph</h3>
+        <p style="color: #6b7280; margin-bottom: 20px; font-size: 0.95rem;">
+            Drag and drop or click above to browse
         </p>
-        <p style="color: #94a3b8; font-size: 0.9rem;">
-            Supported formats: PNG, JPG, JPEG, BMP, TIFF
+        <p style="color: #9ca3af; font-size: 0.85rem;">
+            PNG, JPG, JPEG, BMP, TIFF
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -604,27 +566,27 @@ else:
     
     with col1:
         st.markdown("""
-        <div style="background: white; padding: 25px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-            <div style="font-size: 2.5rem; margin-bottom: 15px;">🎯</div>
-            <h4 style="color: #1e293b; margin-bottom: 8px;">Precise Analysis</h4>
-            <p style="color: #64748b; font-size: 0.9rem;">Pixel-level accuracy for reliable phase fraction measurements</p>
+        <div style="background: #ffffff; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 2rem; margin-bottom: 12px;">🎯</div>
+            <h4 style="color: #1f2937; margin-bottom: 6px; font-size: 0.95rem; font-weight: 600;">Precise Analysis</h4>
+            <p style="color: #6b7280; font-size: 0.85rem; line-height: 1.4;">Pixel-level accuracy for reliable measurements</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
-        <div style="background: white; padding: 25px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-            <div style="font-size: 2.5rem; margin-bottom: 15px;">⚡</div>
-            <h4 style="color: #1e293b; margin-bottom: 8px;">Real-Time Results</h4>
-            <p style="color: #64748b; font-size: 0.9rem;">See calculations update instantly as you paint</p>
+        <div style="background: #ffffff; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 2rem; margin-bottom: 12px;">⚡</div>
+            <h4 style="color: #1f2937; margin-bottom: 6px; font-size: 0.95rem; font-weight: 600;">Real-Time Results</h4>
+            <p style="color: #6b7280; font-size: 0.85rem; line-height: 1.4;">See calculations update instantly</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
         st.markdown("""
-        <div style="background: white; padding: 25px; border-radius: 16px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-            <div style="font-size: 2.5rem; margin-bottom: 15px;">🖌️</div>
-            <h4 style="color: #1e293b; margin-bottom: 8px;">Easy to Use</h4>
-            <p style="color: #64748b; font-size: 0.9rem;">Intuitive brush and eraser tools with adjustable sizes</p>
+        <div style="background: #ffffff; padding: 20px; border-radius: 10px; text-align: center; border: 1px solid #e5e7eb;">
+            <div style="font-size: 2rem; margin-bottom: 12px;">🖌️</div>
+            <h4 style="color: #1f2937; margin-bottom: 6px; font-size: 0.95rem; font-weight: 600;">Easy to Use</h4>
+            <p style="color: #6b7280; font-size: 0.85rem; line-height: 1.4;">Intuitive brush and eraser tools</p>
         </div>
         """, unsafe_allow_html=True)
