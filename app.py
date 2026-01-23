@@ -28,11 +28,44 @@ with st.sidebar:
     st.header("Tools")
     tool = st.radio("Tool", ["Brush", "Eraser"])
     brush_size = st.slider("Brush Size", 2, 50, 15)
+    st.markdown("---")
+    clear_canvas = st.button("🗑️ Clear All", use_container_width=True)
+
+# Custom CSS to change file uploader button text
+st.markdown("""
+<style>
+    [data-testid="stFileUploader"] button {
+        display: none;
+    }
+    [data-testid="stFileUploader"] section {
+        padding: 0;
+    }
+    [data-testid="stFileUploader"] section > input + div {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Main
 uploaded = st.file_uploader("Upload Microstructure Image", type=["png", "jpg", "jpeg", "bmp", "tiff"])
 
 if uploaded:
+    # Track image to detect new uploads
+    current_image_key = f"{uploaded.name}_{uploaded.size}"
+    
+    # Check if new image uploaded
+    if 'last_image_key' not in st.session_state or st.session_state.last_image_key != current_image_key:
+        st.session_state.last_image_key = current_image_key
+        st.session_state.clear_canvas = True
+    
+    # Check if Clear All button pressed
+    if clear_canvas:
+        st.session_state.clear_canvas = True
+    
+    should_clear = st.session_state.get('clear_canvas', False)
+    if should_clear:
+        st.session_state.clear_canvas = False
+    
     img = Image.open(uploaded).convert("RGB")
     max_w, max_h = 800, 550
     scale = min(max_w/img.width, max_h/img.height, 1.0)
@@ -43,6 +76,7 @@ if uploaded:
     stroke_color = "rgba(220,50,50,0.7)" if tool == "Brush" else "rgba(0,0,0,0)"
     eraser_mode = "true" if tool == "Eraser" else "false"
     total_px = cw * ch
+    clear_js = "localStorage.removeItem('pearliteCanvas');" if should_clear else ""
     
     canvas_html = f"""
     <style>
@@ -90,6 +124,8 @@ if uploaded:
     </div>
     
     <script>
+    {clear_js}
+    
     const canvas = document.getElementById('drawCanvas');
     const ctx = canvas.getContext('2d');
     let isDrawing = false;
